@@ -1,0 +1,8 @@
+{
+  "server_url": "http://YOUR-SERVER-IP-OR-DOMAIN",
+  "indexer_token": "av_PASTE_YOUR_TOKEN_HERE",
+  "batch_size": 500,
+  "sas_read_speed_mbps": 500,
+  "local_ui_port": 8989,
+  "cache_dir": "cache"
+}

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArchiveVault Indexer</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #4f6ef7;
+    --accent-hover: #6b85ff;
+    --success: #22c55e;
+    --error: #ef4444;
+    --warn: #f59e0b;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+  .logo { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+  .logo span { color: var(--text-muted); font-weight: 400; font-size: 13px; margin-left: 4px; }
+  .conn-badge { margin-left: auto; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .conn-badge.ok { background: rgba(34,197,94,0.15); color: var(--success); }
+  .conn-badge.fail { background: rgba(239,68,68,0.15); color: var(--error); }
+
+  .main { max-width: 900px; margin: 0 auto; padding: 28px 20px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
+  .card-title { font-size: 15px; font-weight: 600; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+  .card-title .num { background: var(--accent); color: #fff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+  input, select { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 7px; font-size: 13px; outline: none; transition: border-color 0.2s; }
+  input:focus, select:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--text-muted); }
+
+  .emp-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; position: relative; }
+  .emp-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .emp-label { font-size: 12px; font-weight: 600; color: var(--accent); text-transform: uppercase; }
+  .remove-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px; }
+  .remove-btn:hover { color: var(--error); background: rgba(239,68,68,0.1); }
+
+  .folder-row { display: flex; gap: 8px; align-items: flex-end; }
+  .folder-row input { flex: 1; }
+  .browse-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 14px; border-radius: 7px; cursor: pointer; white-space: nowrap; font-size: 13px; }
+  .browse-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .preview-bar { margin-top: 8px; font-size: 12px; color: var(--text-muted); min-height: 16px; }
+  .preview-bar.loaded { color: var(--success); }
+  .preview-bar.error { color: var(--error); }
+
+  .add-emp-btn { width: 100%; padding: 10px; background: transparent; border: 1px dashed var(--border); color: var(--text-muted); border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+  .add-emp-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn { padding: 11px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .progress-section { display: none; }
+  .progress-section.visible { display: block; }
+  .progress-label { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+  .progress-track { background: var(--surface2); border-radius: 20px; height: 10px; overflow: hidden; }
+  .progress-fill { background: var(--accent); height: 100%; border-radius: 20px; transition: width 0.3s ease; }
+  .progress-msg { margin-top: 10px; color: var(--text-muted); font-size: 12px; }
+
+  .status-done { color: var(--success); font-weight: 600; }
+  .status-error { color: var(--error); font-weight: 600; }
+
+  .error-list { margin-top: 12px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: 7px; padding: 12px; font-size: 12px; max-height: 120px; overflow-y: auto; }
+
+  /* Folder browser modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); width: 560px; max-height: 70vh; display: flex; flex-direction: column; }
+  .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .modal-header h3 { font-size: 15px; font-weight: 600; }
+  .modal-close { background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer; line-height: 1; }
+  .modal-path { padding: 10px 20px; background: var(--surface2); font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); word-break: break-all; }
+  .modal-body { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .folder-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; transition: background 0.15s; }
+  .folder-item:hover { background: var(--surface2); }
+  .folder-icon { font-size: 18px; }
+  .folder-name { flex: 1; font-size: 13px; }
+  .folder-count { font-size: 11px; color: var(--text-muted); }
+  .folder-select-btn { background: var(--accent); color: #fff; border: none; padding: 4px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+  .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 9px 18px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .loading-spinner { text-align: center; padding: 30px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">ArchiveVault <span>Indexer</span></div>
+  <div class="conn-badge fail" id="connBadge">Checking...</div>
+</div>
+
+<div class="main">
+
+  <!-- Drive Info -->
+  <div class="card">
+    <div class="card-title"><span class="num">1</span> Drive Information</div>
+    <div class="grid2" style="margin-bottom:14px">
+      <div>
+        <label>Drive Number *</label>
+        <input type="text" id="driveNumber" placeholder="e.g. D042">
+      </div>
+      <div>
+        <label>Capacity (GB) *</label>
+        <input type="number" id="capacityGb" placeholder="e.g. 4000" min="1">
+      </div>
+    </div>
+    <div class="grid3">
+      <div>
+        <label>Row *</label>
+        <input type="text" id="shelfRow" placeholder="e.g. Row-2">
+      </div>
+      <div>
+        <label>Shelf *</label>
+        <input type="text" id="shelfShelf" placeholder="e.g. B">
+      </div>
+      <div>
+        <label>Slot *</label>
+        <input type="text" id="shelfSlot" placeholder="e.g. 4">
+      </div>
+    </div>
+  </div>
+
+  <!-- Employee Folders -->
+  <div class="card">
+    <div class="card-title"><span class="num">2</span> Employee Folders on This Drive</div>
+    <div id="empList"></div>
+    <button class="add-emp-btn" onclick="addEmployee()">+ Add Employee Folder</button>
+  </div>
+
+  <!-- Index Button + Progress -->
+  <div class="card">
+    <div class="card-title"><span class="num">3</span> Index Drive</div>
+    <button class="btn btn-primary" id="indexBtn" onclick="startIndexing()">Start Indexing</button>
+
+    <div class="progress-section" id="progressSection" style="margin-top:18px">
+      <div class="progress-label">
+        <span id="progressMsg">Preparing...</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+      <div class="progress-msg" id="progressDetail"></div>
+      <div class="error-list" id="errorList" style="display:none"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Folder Browser Modal -->
+<div class="modal-overlay" id="folderModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📁 Browse & Select Folder</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-path" id="modalPath">Loading...</div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <button class="btn-outline" onclick="navigateUp()">↑ Up</button>
+      <button class="btn btn-primary" style="flex:1" onclick="selectCurrentFolder()">Select Current Folder</button>
+      <button class="btn-outline" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let empCount = 0;
+let activeEmpTarget = null;
+let currentBrowsePath = null;
+let statusInterval = null;
+
+// ── Init ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  checkConnection();
+  addEmployee();
+});
+
+async function checkConnection() {
+  try {
+    const r = await fetch('/api/verify');
+    const d = await r.json();
+    const badge = document.getElementById('connBadge');
+    if (d.connected) {
+      badge.textContent = '● Connected';
+      badge.className = 'conn-badge ok';
+    } else {
+      badge.textContent = '● Disconnected';
+      badge.className = 'conn-badge fail';
+    }
+  } catch {
+    document.getElementById('connBadge').textContent = '● Offline';
+  }
+}
+
+// ── Employee Management ───────────────────────────────────────
+function addEmployee() {
+  empCount++;
+  const id = empCount;
+  const div = document.createElement('div');
+  div.className = 'emp-card';
+  div.id = `emp-${id}`;
+  div.innerHTML = `
+    <div class="emp-card-header">
+      <span class="emp-label">Employee ${id}</span>
+      ${id > 1 ? `<button class="remove-btn" onclick="removeEmployee(${id})">×</button>` : ''}
+    </div>
+    <div class="grid2" style="margin-bottom:12px">
+      <div>
+        <label>Employee Code *</label>
+        <input type="text" id="empCode-${id}" placeholder="e.g. EMP2041">
+      </div>
+      <div>
+        <label>Full Name *</label>
+        <input type="text" id="empName-${id}" placeholder="e.g. John Malik">
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label>Department</label>
+      <input type="text" id="empDept-${id}" placeholder="e.g. IT">
+    </div>
+    <div>
+      <label>Employee Folder Path *</label>
+      <div class="folder-row">
+        <input type="text" id="empPath-${id}" placeholder="e.g. D:\\john_malik or /mnt/sas/john_malik"
+          onchange="previewFolder(${id})">
+        <button class="browse-btn" onclick="openBrowser(${id})">📁 Browse</button>
+      </div>
+      <div class="preview-bar" id="preview-${id}"></div>
+    </div>
+  `;
+  document.getElementById('empList').appendChild(div);
+}
+
+function removeEmployee(id) {
+  document.getElementById(`emp-${id}`).remove();
+}
+
+async function previewFolder(id) {
+  const path = document.getElementById(`empPath-${id}`).value.trim();
+  const bar = document.getElementById(`preview-${id}`);
+  if (!path) { bar.textContent = ''; return; }
+  bar.textContent = 'Scanning...';
+  bar.className = 'preview-bar';
+  try {
+    const r = await fetch(`/api/preview?path=${encodeURIComponent(path)}`);
+    const d = await r.json();
+    if (r.ok) {
+      bar.textContent = `✓ ${d.total_files.toLocaleString()} files · ${d.total_gb} GB`;
+      bar.className = 'preview-bar loaded';
+    } else {
+      bar.textContent = `✗ ${d.detail}`;
+      bar.className = 'preview-bar error';
+    }
+  } catch {
+    bar.textContent = '✗ Cannot scan folder';
+    bar.className = 'preview-bar error';
+  }
+}
+
+// ── Folder Browser ────────────────────────────────────────────
+function openBrowser(empId) {
+  activeEmpTarget = empId;
+  document.getElementById('folderModal').classList.add('open');
+  loadFolder(null);
+}
+
+function closeModal() {
+  document.getElementById('folderModal').classList.remove('open');
+  activeEmpTarget = null;
+}
+
+async function loadFolder(path) {
+  currentBrowsePath = path;
+  document.getElementById('modalPath').textContent = path || 'Root / Mounted Drives';
+  document.getElementById('modalBody').innerHTML = '<div class="loading-spinner">Loading...</div>';
+  try {
+    const url = path ? `/api/browse?path=${encodeURIComponent(path)}` : '/api/browse';
+    const r = await fetch(url);
+    const d = await r.json();
+    renderFolderEntries(d);
+  } catch {
+    document.getElementById('modalBody').innerHTML = '<div class="loading-spinner">Error loading folder</div>';
+  }
+}
+
+function renderFolderEntries(data) {
+  const body = document.getElementById('modalBody');
+  if (!data.entries || data.entries.length === 0) {
+    body.innerHTML = '<div class="loading-spinner">No subfolders found</div>';
+    return;
+  }
+  body.innerHTML = data.entries.map(e => `
+    <div class="folder-item">
+      <span class="folder-icon">📁</span>
+      <span class="folder-name" onclick="loadFolder('${escHtml(e.path)}')">${escHtml(e.name)}</span>
+      <span class="folder-count">${e.file_count !== undefined ? e.file_count + ' files' : ''}</span>
+      <button class="folder-select-btn" onclick="selectFolder('${escHtml(e.path)}')">Select</button>
+    </div>
+  `).join('');
+}
+
+function navigateUp() {
+  if (!currentBrowsePath) return;
+  loadFolder(null); // Go to root; a proper parent nav is done via loadFolder with parent path
+  fetch(`/api/browse?path=${encodeURIComponent(currentBrowsePath)}`)
+    .then(r => r.json())
+    .then(d => { if (d.parent) loadFolder(d.parent); else loadFolder(null); });
+}
+
+function selectFolder(path) {
+  if (activeEmpTarget) {
+    document.getElementById(`empPath-${activeEmpTarget}`).value = path;
+    previewFolder(activeEmpTarget);
+  }
+  closeModal();
+}
+
+function selectCurrentFolder() {
+  if (currentBrowsePath) selectFolder(currentBrowsePath);
+}
+
+function escHtml(str) {
+  return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// ── Indexing ──────────────────────────────────────────────────
+async function startIndexing() {
+  const driveNumber = document.getElementById('driveNumber').value.trim();
+  const capacityGb = parseFloat(document.getElementById('capacityGb').value);
+  const shelfRow = document.getElementById('shelfRow').value.trim();
+  const shelfShelf = document.getElementById('shelfShelf').value.trim();
+  const shelfSlot = document.getElementById('shelfSlot').value.trim();
+
+  if (!driveNumber || !capacityGb || !shelfRow || !shelfShelf || !shelfSlot) {
+    alert('Please fill in all drive and shelf fields.'); return;
+  }
+
+  const employees = [];
+  const empCards = document.querySelectorAll('.emp-card');
+  for (const card of empCards) {
+    const id = card.id.replace('emp-', '');
+    const code = document.getElementById(`empCode-${id}`).value.trim();
+    const name = document.getElementById(`empName-${id}`).value.trim();
+    const dept = document.getElementById(`empDept-${id}`).value.trim();
+    const path = document.getElementById(`empPath-${id}`).value.trim();
+    if (!code || !name || !path) { alert(`Please complete all fields for Employee ${id}.`); return; }
+    employees.push({ emp_code: code, full_name: name, department: dept || null, folder_path: path });
+  }
+
+  if (employees.length === 0) { alert('Add at least one employee.'); return; }
+
+  document.getElementById('indexBtn').disabled = true;
+  document.getElementById('progressSection').classList.add('visible');
+  document.getElementById('errorList').style.display = 'none';
+
+  try {
+    const r = await fetch('/api/index', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ drive_number: driveNumber, capacity_gb: capacityGb,
+        shelf_row: shelfRow, shelf_shelf: shelfShelf, shelf_slot: shelfSlot, employees })
+    });
+    const d = await r.json();
+    if (!r.ok) { alert(d.detail || 'Failed to start indexing.'); document.getElementById('indexBtn').disabled = false; return; }
+    pollStatus();
+  } catch (e) {
+    alert('Connection error: ' + e.message);
+    document.getElementById('indexBtn').disabled = false;
+  }
+}
+
+function pollStatus() {
+  statusInterval = setInterval(async () => {
+    try {
+      const r = await fetch('/api/status');
+      const d = await r.json();
+      updateProgress(d);
+      if (!d.running && (d.status === 'completed' || d.status === 'error')) {
+        clearInterval(statusInterval);
+        document.getElementById('indexBtn').disabled = false;
+      }
+    } catch {}
+  }, 800);
+}
+
+function updateProgress(d) {
+  const pct = d.total > 0 ? Math.min(100, Math.round((d.progress / d.total) * 100)) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+
+  if (d.status === 'completed') {
+    document.getElementById('progressMsg').className = 'status-done';
+    document.getElementById('progressMsg').textContent = '✓ ' + d.message;
+    document.getElementById('progressDetail').textContent = '';
+  } else if (d.status === 'error') {
+    document.getElementById('progressMsg').className = 'status-error';
+    document.getElementById('progressMsg').textContent = '✗ ' + d.message;
+  } else {
+    document.getElementById('progressMsg').className = '';
+    document.getElementById('progressMsg').textContent = d.progress.toLocaleString() + ' / ' + d.total.toLocaleString() + ' records';
+    document.getElementById('progressDetail').textContent = d.message;
+  }
+
+  if (d.errors && d.errors.length > 0) {
+    const el = document.getElementById('errorList');
+    el.style.display = 'block';
+    el.innerHTML = '<strong style="color:var(--warn)">Warnings (' + d.errors.length + '):</strong><br>' + d.errors.slice(0, 20).join('<br>');
+  }
+}
+</script>
+</body>
+</html>
